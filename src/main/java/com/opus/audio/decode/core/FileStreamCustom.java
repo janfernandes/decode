@@ -7,63 +7,52 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.Iterator;
 
-public class FileStreamCustom implements PhysicalOggStream{
+public class FileStreamCustom {
 
-    private boolean closed=false;
+    private boolean closed = false;
     private RandomAccessFile source;
     private long[] pageOffsets;
 
-    private HashMap logicalStreams=new HashMap();
+    private HashMap logicalStreams = new HashMap();
 
     public FileStreamCustom(RandomAccessFile source) throws IOException {
-        this.source=source;
-        ArrayList po=new ArrayList();
-        int pageNumber=0;
+        this.source = source;
+        ArrayList po = new ArrayList();
+        int pageNumber = 0;
         try {
-            while(true) {
+            while (true) {
                 po.add(new Long(this.source.getFilePointer()));
 
                 // skip data if pageNumber>0
-                OggPage op=getNextPage(pageNumber>0);
-                if(op==null) {
+                OggPage op = getNextPage(pageNumber > 0);
+                if (op == null) {
                     break;
                 }
 
-                LogicalOggStreamCustomImpl los=getLogicalStream(op.getStreamSerialNumber());
-                if(los==null) {
-                    los=new LogicalOggStreamCustomImpl(this, op.getStreamSerialNumber());
-                    logicalStreams.put(new Integer(op.getStreamSerialNumber()), los);
-                }
-
-                if(pageNumber==0) {
-                    los.checkFormat(op);
+                LogicalOggStreamCustomImpl los = getLogicalStream(op.getStreamSerialNumber());
+                if (los == null) {
+                    los = new LogicalOggStreamCustomImpl(this);
+                    logicalStreams.put(op.getStreamSerialNumber(), los);
                 }
 
                 los.addPageNumberMapping(pageNumber);
                 los.addGranulePosition(op.getAbsoluteGranulePosition());
 
-                if(pageNumber>0) {
-                    this.source.seek(this.source.getFilePointer()+op.getTotalLength());
+                if (pageNumber > 0) {
+                    this.source.seek(this.source.getFilePointer() + op.getTotalLength());
                 }
 
                 pageNumber++;
             }
-        }
-        catch(EndOfOggStreamException e) {
+        } catch (EndOfOggStreamException e) {
             // ok
         }
-        catch(IOException e) {
-            throw e;
-        }
-        //System.out.println("pageNumber: "+pageNumber);
         this.source.seek(0L);
-        pageOffsets=new long[po.size()];
-        int i=0;
-        Iterator iter=po.iterator();
-        while(iter.hasNext()) {
-            pageOffsets[i++]=((Long)iter.next()).longValue();
+        pageOffsets = new long[po.size()];
+        int i = 0;
+        for (Object o : po) {
+            pageOffsets[i++] = (Long) o;
         }
     }
 
@@ -76,15 +65,15 @@ public class FileStreamCustom implements PhysicalOggStream{
     }
 
     public void close() throws IOException {
-        closed=true;
+        closed = true;
         source.close();
     }
 
-    private OggPage getNextPage() throws IOException  {
+    private OggPage getNextPage() throws IOException {
         return getNextPage(false);
     }
 
-    private OggPage getNextPage(boolean skipData) throws IOException  {
+    private OggPage getNextPage(boolean skipData) throws IOException {
         return OggPage.create(source, skipData);
     }
 
@@ -94,18 +83,11 @@ public class FileStreamCustom implements PhysicalOggStream{
     }
 
     private LogicalOggStreamCustomImpl getLogicalStream(int serialNumber) {
-        return (LogicalOggStreamCustomImpl)logicalStreams.get(new Integer(serialNumber));
-    }
-
-    public void setTime(long granulePosition) throws IOException {
-        for(Iterator iter=logicalStreams.values().iterator(); iter.hasNext(); ) {
-            LogicalOggStreamCustomImpl los=(LogicalOggStreamCustomImpl)iter.next();
-            los.setTime(granulePosition);
-        }
+        return (LogicalOggStreamCustomImpl) logicalStreams.get(new Integer(serialNumber));
     }
 
     /**
-     *  @return always <code>true</code>
+     * @return always <code>true</code>
      */
 
     public boolean isSeekable() {
